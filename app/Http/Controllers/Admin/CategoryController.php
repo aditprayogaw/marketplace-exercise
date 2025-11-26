@@ -12,7 +12,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CategoryController extends Controller
 {
-    // Menggunakan AuthorizesRequests yang diwarisi dari Controller induk (untuk otorisasi)
     use AuthorizesRequests; 
 
     protected $categoryService;
@@ -20,7 +19,7 @@ class CategoryController extends Controller
     public function __construct(CategoryService $categoryService)
     {
         $this->categoryService = $categoryService;
-        // Middleware sudah di route group (auth:admin)
+
     }
 
     /**
@@ -28,13 +27,10 @@ class CategoryController extends Controller
      */
     public function index()
     {
-        // UBAH: Mengambil semua kategori dengan Paginasi.
-        // Paginasi kategori bertingkat (hierarki) akan sedikit terganggu, 
-        // namun ini adalah cara termudah untuk memberikan kontrol navigasi dasar.
         $categories = Category::with('parent')
-                        ->orderBy('parent_id') // Urutkan berdasarkan parent
+                        ->orderBy('parent_id') 
                         ->orderBy('name')
-                        ->paginate(10); // Paginasi, 15 item per halaman
+                        ->paginate(10); 
         
         return view('admin.categories.index', compact('categories'));
     }

@@ -3,100 +3,182 @@
 namespace Database\Seeders;
 
 use App\Models\Admin;
-use App\Models\Customer;
-use App\Models\Vendor;
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Product;
-use App\Models\Order;
-use App\Models\Reviews;
+use App\Models\Vendor;
+use Database\Factories\ReviewFactory; 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
+    /**
+     * @var \Faker\Generator
+     */
+    protected $faker; 
+
+    /**
+     * Seed the application's database.
+     */
     public function run(): void
     {
-        // 1. Data Admin (1)
-        Admin::factory()->create([
-            'name' => 'Super Admin',
-            'email' => 'admin@admin.com',
-            'password' => \Hash::make('password'),
+        $this->faker = \Faker\Factory::create('id_ID');
+
+        // 1. CLEAR EXISTING DATA
+        $this->command->info('Menghapus data lama...');
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('admins')->truncate();
+        DB::table('categories')->truncate();
+        DB::table('vendors')->truncate();
+        DB::table('customers')->truncate();
+        DB::table('products')->truncate();
+        DB::table('orders')->truncate();
+        DB::table('order_items')->truncate();
+        DB::table('reviews')->truncate();
+        DB::table('favorites')->truncate(); 
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        $this->command->info('Data lama berhasil dihapus.');
+
+
+        // 2. ADMIN & CUSTOMER ACCOUNTS (Default)
+        Admin::create([
+            'name' => 'Admin Utama',
+            'email' => 'admin@mail.com',
+            'password' => Hash::make('password'),
+        ]);
+        Customer::create([
+            'name' => 'Customer Utama',
+            'email' => 'customer@mail.com',
+            'password' => Hash::make('password'),
         ]);
 
-        // 2. Data Vendor (10)
-        Vendor::factory(10)->create();
-        $vendorIds = Vendor::pluck('id');
-
-        // 3. Data Customer (100)
-        Customer::factory(100)->create();
-        $customerIds = Customer::pluck('id');
-        
-        // 4. Data Kategori (10 Root & Children)
-        $this->seedCategories();
-        $categoryIds = Category::pluck('id');
-
-        // 5. Data Produk (500)
-        Product::factory(500)->make()
-            ->each(function ($product) use ($vendorIds, $categoryIds) {
-                $product->vendor_id = $vendorIds->random();
-                $product->category_id = $categoryIds->random();
-                $product->save();
-            });
-        $productIds = Product::pluck('id');
-
-
-        // 6. Data Order (500) & OrderItem (dengan chunk)
-        Order::factory(500)->make()
-            ->chunk(100)
-            ->each(function ($orderChunk) use ($customerIds, $productIds) {
-                foreach ($orderChunk as $order) {
-                    $order->customer_id = $customerIds->random();
-                    $order->save();
-
-                    // Buat 1-5 Order Items
-                    $itemCount = rand(1, 5);
-                    for ($i = 0; $i < $itemCount; $i++) {
-                        $product = Product::find($productIds->random());
-                        $order->items()->create([
-                            'product_id' => $product->id,
-                            'qty' => rand(1, 5),
-                            'price' => $product->price,
-                        ]);
-                    }
-                    // Hitung total harga order
-                    $order->update(['total_price' => $order->items->sum(fn($item) => $item->qty * $item->price)]);
-                }
-            });
-        
-        // 7. Data Review (1000)
-        Reviews::factory(1000)->make()
-            ->chunk(100)
-            ->each(function ($reviewChunk) use ($customerIds, $productIds) {
-                foreach ($reviewChunk as $review) {
-                    $review->customer_id = $customerIds->random();
-                    $review->product_id = $productIds->random();
-                    // Mengatasi duplikat key karena unique constraint customer_id + product_id
-                    try {
-                        $review->save();
-                    } catch (\Exception $e) {
-                        continue; 
-                    }
-                }
-            });
-    }
-
-    protected function seedCategories(): void
-    {
-        // Membuat 10 Kategori Root
-        $rootCategories = Category::factory(10)->create(['parent_id' => null]);
-
-        // Membuat 1-3 sub-kategori untuk setiap root
-        $rootCategories->each(function (Category $root) {
-            Category::factory(rand(1, 3))->create(['parent_id' => $root->id]);
+        // 3. SEED CATEGORIES (10 Nested)
+        $this->command->info('Membuat 10 Kategori...');
+        $parentCategories = Category::factory(4)->create();
+        $parentCategories->each(function ($parent) {
+            Category::factory(2)->create(['parent_id' => $parent->id]);
         });
+        Category::factory(2)->create(['parent_id' => null]); 
+        
+        // 4. VENDORS (10)
+        $this->command->info('Membuat 10 Vendor...');
+        $vendors = Vendor::factory(10)->create();
+        
+        // 5. CUSTOMERS (99 + 1 default = 100)
+        $this->command->info('Membuat 100 Customer...');
+        Customer::factory(99)->create();
+        $customerIds = Customer::pluck('id')->all(); 
 
-        // Membuat 1-2 sub-sub-kategori untuk beberapa sub-kategori
-        Category::whereNotNull('parent_id')->inRandomOrder()->limit(5)->get()->each(function (Category $sub) {
-            Category::factory(rand(1, 2))->create(['parent_id' => $sub->id]);
+        // 6. PRODUCTS (500)
+        $this->command->info('Membuat 500 Produk...');
+        $categoryIds = Category::pluck('id')->all();
+        $vendorIds = Vendor::pluck('id')->all();
+
+        Product::factory(500)->make()->each(function ($product) use ($categoryIds, $vendorIds) {
+            $product->category_id = $this->faker->randomElement($categoryIds);
+            $product->vendor_id = $this->faker->randomElement($vendorIds);
+            $product->save();
         });
+        $productIds = Product::pluck('id')->all();
+        
+        // 7. ORDERS (500)
+        $this->command->info('Membuat 500 Pesanan...');
+        $ordersToCreate = 500;
+        $orderItemsData = [];
+        
+        for ($i = 0; $i < $ordersToCreate; $i++) {
+            $customer_id = $this->faker->randomElement($customerIds);
+            $itemCount = $this->faker->numberBetween(1, 5);
+            
+            $status = $this->faker->randomElement(['Pending', 'Paid', 'Shipped', 'Completed', 'Cancelled']);
+            $totalPrice = 0;
+            
+            $currentOrderItems = [];
+            $usedProductIds = [];
+            
+            for ($j = 0; $j < $itemCount; $j++) {
+                $productId = $this->faker->randomElement($productIds);
+                while (in_array($productId, $usedProductIds)) {
+                    $productId = $this->faker->randomElement($productIds);
+                }
+                $usedProductIds[] = $productId;
+
+                $product = Product::find($productId);
+                $qty = $this->faker->numberBetween(1, 3);
+                $subtotal = $product->price * $qty; 
+                $totalPrice += $subtotal;
+                
+                $currentOrderItems[] = [
+                    'product_id' => $productId,
+                    'price' => $product->price,
+                    'qty' => $qty, 
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            $order = [
+                'customer_id' => $customer_id,
+                'status' => $status,
+                'total_price' => $totalPrice,
+                'created_at' => now()->subDays($this->faker->numberBetween(1, 90)),
+                'updated_at' => now(),
+            ];
+
+            $newOrderId = DB::table('orders')->insertGetId($order);
+
+            foreach ($currentOrderItems as $item) {
+                $item['order_id'] = $newOrderId;
+                $orderItemsData[] = $item;
+            }
+        }
+        
+        DB::table('order_items')->insert($orderItemsData);
+
+
+        // 8. REVIEWS (1000)
+        $this->command->info('Membuat 1000 Reviews...');
+        $reviewsToCreate = 1000;
+        $reviewsData = [];
+        $usedPairs = []; 
+        
+        if (empty($customerIds) || empty($productIds)) {
+            $this->command->warn('Tidak ada Customer atau Produk, melewati seeding Reviews.');
+        } else {
+            $this->command->info('Menciptakan Review unik...');
+
+            for ($i = 0; $i < $reviewsToCreate; $i++) {
+
+                if (count($usedPairs) >= count($customerIds) * count($productIds)) {
+                    $this->command->warn('Kehabisan pasangan Customer-Product unik. Hanya membuat ' . count($usedPairs) . ' review.');
+                    break;
+                } do {
+                    $customerId = $this->faker->randomElement($customerIds);
+                    $productId = $this->faker->randomElement($productIds);
+                    $pairKey = $customerId . '-' . $productId;
+                } while (in_array($pairKey, $usedPairs));
+
+                $usedPairs[] = $pairKey;
+                
+                // Buat data review mentah menggunakan Factory::new()->makeOne()
+                $factoryData = ReviewFactory::new()->makeOne()->toArray();
+
+                $reviewsData[] = array_merge($factoryData, [
+                    'customer_id' => $customerId,
+                    'product_id' => $productId,
+                    'created_at' => now()->subDays($this->faker->numberBetween(1, 60)),
+                    'updated_at' => now(),
+                ]);
+            }
+            
+            // Sisipkan data secara masif menggunakan chunking
+            collect($reviewsData)->chunk(500)->each(function ($chunk) {
+                DB::table('reviews')->insert($chunk->toArray());
+            });
+
+            $this->command->info('Review berhasil disisipkan: ' . count($usedPairs) . ' entri unik.');
+        }
     }
 }

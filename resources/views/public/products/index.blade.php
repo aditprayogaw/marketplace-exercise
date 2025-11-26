@@ -41,19 +41,21 @@
                     $isFavorited = in_array($product->id, $favoritedIds);
                 @endphp
 
-                <div class="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 overflow-hidden border border-gray-100 flex flex-col">
+                <div class="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 overflow-hidden border border-gray-100 flex flex-col relative">
                     
-                    {{-- Gambar Produk Placeholder --}}
-                    <div class="h-48 bg-gray-200 flex items-center justify-center text-gray-500 font-semibold relative">
-                        @if($product->image_path)
-                            <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
-                        @else
-                            <span class="text-sm">Gambar Tidak Tersedia</span>
-                        @endif
-
+                    {{-- Gambar Produk & Link --}}
+                    <div class="h-48 bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+                        <a href="{{ route('products.show', ['product' => $product->slug]) }}" class="w-full h-full block">
+                            @if($product->image_path)
+                                <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
+                            @else
+                                <span class="text-sm p-4 block">Gambar Tidak Tersedia</span>
+                            @endif
+                        </a>
+                        
                         {{-- Tombol Wishlist di pojok kanan atas --}}
                         @if ($isCustomerLoggedIn)
-                            <form action="{{ route('customer.wishlist.toggle', $product) }}" method="POST" class="absolute top-2 right-2">
+                            <form action="{{ route('customer.wishlist.toggle', $product) }}" method="POST" class="absolute top-2 right-2 z-10">
                                 @csrf
                                 <button type="submit" title="{{ $isFavorited ? 'Hapus dari Wishlist' : 'Tambah ke Wishlist' }}"
                                     class="p-2 rounded-full shadow-lg transition duration-150 {{ $isFavorited ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white text-gray-500 hover:text-red-500' }}">
@@ -67,8 +69,8 @@
 
                     <div class="p-4 flex-grow flex flex-col justify-between">
                         <div>
-                            <h4 class="text-xl font-semibold text-gray-800 truncate mb-1">
-                                <a href="{{ route('products.show', ['product' => $product->slug]) }}" class="hover:text-indigo-600 transition duration-150">
+                            <h4 class="text-xl font-semibold mb-1">
+                                <a href="{{ route('products.show', ['product' => $product->slug]) }}" class="text-gray-800 hover:text-indigo-600 transition duration-150">
                                     {{ $product->name }}
                                 </a>
                             </h4>

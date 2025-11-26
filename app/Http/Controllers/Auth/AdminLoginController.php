@@ -14,7 +14,6 @@ class AdminLoginController extends Controller
      */
     public function create()
     {
-        // Pastikan Anda membuat view ini (misalnya: resources/views/admin/auth/login.blade.php)
         return view('admin.auth.login'); 
     }
 

@@ -1,3 +1,9 @@
+<?php 
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use App\Models\Reviews; // Diperlukan untuk Policy Check
+use App\Models\Order; // Diperlukan untuk Policy Check
+?>
 <x-customer-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
@@ -7,6 +13,7 @@
 
     <div class="p-6 bg-white overflow-hidden shadow-xl sm:rounded-lg">
         
+        {{-- Pesan Status (Success/Error) --}}
         @if(session('success'))
             <div class="mb-4 p-3 bg-green-100 text-green-700 rounded-lg shadow-md">{{ session('success') }}</div>
         @endif
@@ -27,7 +34,7 @@
                 {{-- Review Rating --}}
                 <div class="mt-4 text-center">
                     <span class="text-3xl font-extrabold text-yellow-600">{{ number_format($product->average_rating, 1) }}</span> / 5.0
-                    <p class="text-sm text-gray-500">({{ $product->reviews->count() }} Review)</p>
+                    <p class="text-sm text-gray-500">({{ $product->reviews->count() }} Ulasan)</p>
                 </div>
             </div>
             
@@ -66,7 +73,7 @@
                         </form>
                     @endif
 
-                    {{-- Tombol Toggle Wishlist --}}
+                    {{-- Tombol Toggle Wishlist (Hanya untuk Customer yang Login) --}}
                     @if (Auth::guard('customer')->check())
                         @php
                             // Cek apakah produk ini ada di wishlist customer yang sedang login
@@ -74,7 +81,7 @@
                         @endphp
                         <form action="{{ route('customer.wishlist.toggle', $product) }}" method="POST" class="inline">
                             @csrf
-                            <button type="submit" class="py-2.5 px-4 rounded-lg border font-semibold transition duration-150 {{ $isFavorited ? 'bg-red-500 text-white border-red-600 hover:bg-red-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                            <button type="submit" title="{{ $isFavorited ? 'Hapus dari Wishlist' : 'Tambah ke Wishlist' }}" class="py-2.5 px-4 rounded-lg border font-semibold transition duration-150 {{ $isFavorited ? 'bg-red-500 text-white border-red-600 hover:bg-red-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" /></svg>
                                 {{ $isFavorited ? 'Hapus Favorit' : 'Tambah Favorit' }}
                             </button>
@@ -84,39 +91,19 @@
             </div>
         </div>
 
-        <div class="mt-10 border-t pt-8">
+        <div class="mt-10 border-t pt-8" id="review-section">
             <h2 class="text-3xl font-bold text-gray-800 mb-6">Ulasan & Rating</h2>
             
-            {{-- Section 1: Formulir Review --}}
+            {{-- Bagian 1: Formulir Review (Terkunci oleh Policy) --}}
             @if (Auth::guard('customer')->check())
-                {{-- Menggunakan Gate::allows() untuk Policy check --}}
-                @can('create', [App\Models\Reviews::class, $product])
-                    <div class="bg-indigo-50 p-6 rounded-lg shadow-md mb-8">
-                        <h3 class="text-xl font-semibold mb-4 text-indigo-700">Tulis Ulasan Anda</h3>
-                        <form action="{{ route('customer.reviews.store', $product) }}" method="POST">
-                            @csrf
-                            <div class="mb-4">
-                                <label for="rating" class="block font-medium text-sm text-gray-700">Rating (1-5)</label>
-                                <select name="rating" id="rating" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2">
-                                    <option value="">Pilih Rating</option>
-                                    @for($i = 5; $i >= 1; $i--)
-                                        <option value="{{ $i }}">{{ $i }} Bintang</option>
-                                    @endfor
-                                </select>
-                                @error('rating') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
-                            </div>
-                            <div class="mb-4">
-                                <label for="comment" class="block font-medium text-sm text-gray-700">Komentar</label>
-                                <textarea name="comment" id="comment" rows="3" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2"></textarea>
-                                @error('comment') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
-                            </div>
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md">Kirim Review</button>
-                        </form>
-                    </div>
+                {{-- Policy Check: Wajib beli dan Completed --}}
+                @can('create', [Reviews::class, $product])
+                    {{-- Form Review hanya dimuat jika Policy mengizinkan --}}
+                    @include('customer.reviews._form', ['product' => $product])
                 @else
+                    {{-- Menampilkan pesan dari Policy (Gate::inspect) jika user tidak memenuhi syarat --}}
                     <div class="bg-yellow-50 p-4 rounded-lg mb-8 text-sm text-yellow-800 border-l-4 border-yellow-500">
-                        {{-- Menampilkan pesan error dari Policy --}}
-                        {{ Gate::inspect('create', [App\Models\Reviews::class, $product])->message() }}
+                        {{ Gate::inspect('create', [Reviews::class, $product])->message() }}
                     </div>
                 @endcan
             @else

@@ -16,7 +16,6 @@ class OrderController extends Controller
     public function __construct(OrderService $orderService)
     {
         $this->orderService = $orderService;
-        // Middleware sudah di route group (auth:admin)
     }
 
     /**
@@ -24,8 +23,7 @@ class OrderController extends Controller
      */
     public function index()
     {
-        // Admin melihat semua order
-        // Eager load customer (Optimasi Query)
+
         $orders = Order::with(['customer'])->latest()->paginate(15);
         return view('admin.orders.index', compact('orders'));
     }

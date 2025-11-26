@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Customer; // FIX: Menggunakan Model Customer
+use App\Models\Customer; 
 use App\Models\Vendor; 
 use App\Models\Admin;
 use Illuminate\Http\Request;
@@ -19,7 +19,6 @@ class UserController extends Controller
 
     public function __construct()
     {
-        // Kebijakan: Hanya Admin yang boleh mengelola user.
         $this->middleware('auth:admin');
     }
 
@@ -55,7 +54,6 @@ class UserController extends Controller
             abort(404);
         }
 
-        // Kita bisa menggunakan Policy di sini, tapi untuk Admin diasumsikan memiliki otoritas penuh.
         return view('admin.users.edit', compact('user', 'role'));
     }
 
@@ -97,7 +95,6 @@ class UserController extends Controller
         if ($role === 'customer') { Customer::findOrFail($id)->delete(); }
         elseif ($role === 'vendor') { Vendor::findOrFail($id)->delete(); }
         elseif ($role === 'admin') { 
-            // Cek: Jangan izinkan Admin menghapus dirinya sendiri
             if (Auth::guard('admin')->id() == $id) {
                 return Redirect::back()->with('error', 'Anda tidak dapat menghapus akun Admin Anda sendiri.');
             }
